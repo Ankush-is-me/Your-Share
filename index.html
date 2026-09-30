@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="description" content="Your Share — scan one merchant QR, split the bill, and give everyone their own payment link." />
+<meta name="theme-color" content="#0b0b0b" />
+<title>Your Share — One bill. Everyone pays.</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>try{if(localStorage.getItem("yourshare-theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+<style>
+:root{--bg:#f5f5f2;--surface:#fff;--surface-2:#fafaf8;--text:#171717;--muted:#777770;--line:#e6e6df;--button:#111;--button-text:#fff;--danger:#c63c3c;--shadow:0 16px 50px rgba(0,0,0,.06)}
+[data-theme="dark"]{--bg:#080808;--surface:#151515;--surface-2:#101010;--text:#f4f4ef;--muted:#9c9c96;--line:#292929;--button:#f4f4ef;--button-text:#0b0b0b;--danger:#ff7777;--shadow:0 16px 50px rgba(0,0,0,.3)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:background .2s,color .2s;overflow-x:hidden}
+button,input{font:inherit}button{cursor:pointer}
+.app{width:100%;max-width:450px;min-height:100vh;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) calc(30px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));background:var(--surface-2);box-shadow:0 0 70px rgba(0,0,0,.05)}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:34px}
+.logo{font-size:20px;font-weight:850;letter-spacing:-1.2px}
+.logo-dot{width:7px;height:7px;display:inline-block;border-radius:50%;margin-left:2px;background:var(--text);vertical-align:2px}
+.top-actions{display:flex;gap:8px}
+.icon-btn{width:44px;height:44px;border:1px solid var(--line);border-radius:13px;background:var(--surface);color:var(--text);display:grid;place-items:center;transition:.18s}
+.icon-btn:active{transform:scale(.95)}
+.screen{display:none;animation:pageIn .25s ease}.screen.active{display:block}
+@keyframes pageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.eyebrow{font-size:10px;font-weight:850;color:var(--muted);text-transform:uppercase;letter-spacing:1.7px}
+h1{margin:12px 0 15px;font-size:clamp(41px,11vw,54px);line-height:.95;letter-spacing:-3.3px}
+h2{margin:9px 0 10px;font-size:28px;line-height:1;letter-spacing:-1.5px}
+h3{margin:0;letter-spacing:-.5px}
+.sub{margin:0;color:var(--muted);font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.card{margin:12px 0;padding:20px;border:1px solid var(--line);border-radius:24px;background:var(--surface);box-shadow:var(--shadow)}
+.primary,.secondary{width:100%;min-height:52px;border-radius:16px;font-size:14px;font-weight:800;transition:.18s}
+.primary{border:0;background:var(--button);color:var(--button-text)}
+.secondary{border:1px solid var(--line);background:var(--surface);color:var(--text)}
+.primary:active,.secondary:active{transform:scale(.985)}
+.btn-row{display:flex;gap:10px}.btn-row>*{flex:1}
+.gap10{height:10px}
+.hero{padding:12px 0 28px}
+.flow-line{display:flex;align-items:center;gap:8px;margin-top:17px}
+.flow-pill{padding:9px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);font-size:11px;font-weight:800;white-space:nowrap}
+.flow-arrow{color:var(--muted)}
+.progress{display:flex;gap:6px;margin-bottom:26px}
+.progress-bar{height:4px;flex:1;border-radius:999px;background:var(--line)}.progress-bar.on{background:var(--button)}
+.legal-card{max-height:54vh;overflow-y:auto}
+.legal-text{color:var(--muted);font-size:12px;line-height:1.65}.legal-text strong{color:var(--text)}
+.check-row{display:flex;gap:11px;align-items:flex-start;margin:15px 0 8px;color:var(--muted);font-size:13px;line-height:1.45}
+.check-row input{width:20px;height:20px;margin-top:1px;accent-color:var(--text);flex-shrink:0}
+.err{min-height:18px;margin-bottom:8px;color:var(--danger);font-size:12px;font-weight:700}
+.scanner{position:relative;overflow:hidden;width:100%;aspect-ratio:1/1;margin:16px 0 13px;border-radius:26px;background:#050505;display:grid;place-items:center}
+.scanner video{width:100%;height:100%;object-fit:cover}
+.scan-overlay{position:absolute;inset:0;pointer-events:none}
+.scan-frame{position:absolute;width:63%;aspect-ratio:1;left:50%;top:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.55);border-radius:21px;box-shadow:0 0 0 999px rgba(0,0,0,.43)}
+.scan-line{position:absolute;left:7%;right:7%;top:6%;height:2px;border-radius:999px;background:#fff;box-shadow:0 0 14px 3px rgba(255,255,255,.7);animation:scanMove 2s ease-in-out infinite}
+.idle .scan-line{display:none}
+@keyframes scanMove{0%,100%{top:7%}50%{top:93%}}
+.corner{position:absolute;width:22px;height:22px;border-color:#fff;border-style:solid}
+.corner.tl{top:18%;left:19%;border-width:3px 0 0 3px;border-radius:8px 0 0 0}
+.corner.tr{top:18%;right:19%;border-width:3px 3px 0 0;border-radius:0 8px 0 0}
+.corner.bl{bottom:18%;left:19%;border-width:0 0 3px 3px;border-radius:0 0 0 8px}
+.corner.br{right:19%;bottom:18%;border-width:0 3px 3px 0;border-radius:0 0 8px 0}
+.scanner-status{position:absolute;right:13px;bottom:13px;left:13px;padding:10px 12px;border-radius:13px;background:rgba(0,0,0,.62);color:#fff;font-size:11px;text-align:center;backdrop-filter:blur(10px)}
+.file-input{display:none}
+.camera-note{margin-top:12px;color:var(--muted);font-size:11px;line-height:1.5;text-align:center}
+.field-label{display:block;margin-bottom:7px;color:var(--muted);font-size:11px;font-weight:800}
+.input{width:100%;padding:14px;border:1px solid var(--line);border-radius:14px;outline:none;background:var(--surface-2);color:var(--text);font-size:18px}
+.input:focus{border-color:var(--text)}
+.tabs{display:flex;gap:4px;margin-bottom:17px;padding:4px;border-radius:14px;background:var(--line)}
+.tab{flex:1;border:0;padding:12px;border-radius:10px;background:transparent;color:var(--muted);font-size:12px;font-weight:800}
+.tab.selected{background:var(--surface);color:var(--text)}
+.counter{display:flex;align-items:center;justify-content:space-between}
+.counter-num{font-size:30px;font-weight:850}
+.split-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0;border-bottom:1px solid var(--line)}
+.split-row:last-child{border-bottom:0}
+.person{font-size:14px;font-weight:750}.share{font-size:14px;font-weight:850}
+.name-in{flex:1;min-width:0;font-size:14px;padding:12px}
+.amt-in{width:110px;font-size:14px;padding:12px;text-align:right}
+.x{border:0;background:transparent;color:var(--muted);font-size:18px;width:28px}
+.qr-wrap{width:min(250px,100%);margin:18px auto;padding:12px;border-radius:18px;background:#fff;border:1px solid #ddd}
+.qr-wrap svg{display:block;width:100%;height:auto}
+.amount{margin:5px 0;text-align:center;font-size:49px;font-weight:900;letter-spacing:-2.5px}
+.merchant-name{text-align:center;font-weight:800}
+.merchant-handle{margin-top:4px;color:var(--muted);font-size:11px;text-align:center;overflow-wrap:anywhere}
+.tag{display:inline-block;margin-top:10px;padding:5px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);font-size:10px;font-weight:800}
+.waiting{color:var(--muted);font-size:11px;font-weight:700;text-align:right}
+.bottom-nav{position:sticky;bottom:0;z-index:3;display:flex;justify-content:space-around;margin-top:28px;padding-top:15px;background:var(--surface-2)}
+.bottom-nav button{border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:750;min-height:40px}
+.cookie-banner{position:fixed;z-index:20;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));left:14px;width:min(420px,calc(100% - 28px));margin:auto;padding:17px;border:1px solid var(--line);border-radius:21px;background:var(--surface);color:var(--text);box-shadow:0 20px 70px rgba(0,0,0,.2);display:none}
+.cookie-banner.show{display:block;animation:pageIn .25s ease}
+.cookie-title{font-size:14px;font-weight:850}
+.cookie-text{margin:7px 0 13px;color:var(--muted);font-size:12px;line-height:1.5}
+.cookie-banner .btn-row button{min-height:44px;font-size:12px}
+.toast{position:fixed;z-index:30;top:18px;left:50%;max-width:90vw;padding:10px 15px;border-radius:999px;background:var(--text);color:var(--bg);font-size:12px;font-weight:800;opacity:0;pointer-events:none;transform:translate(-50%,-10px);transition:.2s;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.footer{margin-top:35px;padding-top:17px;border-top:1px solid var(--line);color:var(--muted);text-align:center;font-size:10px;line-height:1.55}
+.footer button{margin-top:5px;border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:11px;min-height:32px}
+@media(min-width:700px){body{padding:30px 0}.app{min-height:calc(100vh - 60px);border-radius:30px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="topbar">
+  <div class="logo">Your Share<span class="logo-dot"></span></div>
+  <div class="top-actions">
+    <button class="icon-btn" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle theme">◐</button>
+    <button class="icon-btn" type="button" onclick="showOnly('terms')" aria-label="Terms" title="Terms">⋯</button>
+  </div>
+</header>
+
+<section id="home" class="screen">
+  <div class="hero">
+    <div class="eyebrow">Bill splitting, rethought</div>
+    <h1>One bill.<br />Everyone pays.</h1>
+    <p class="sub">Scan one merchant QR, split the amount, and give everyone their own way to pay.</p>
+    <div style="height:20px"></div>
+    <button class="primary" onclick="go('scan')">Split a bill →</button>
+    <div class="gap10"></div>
+    <button class="secondary" onclick="go('how')">See how it works</button>
+  </div>
+  <div class="card">
+    <div class="eyebrow">The whole idea</div>
+    <h2>Scan → Split → Pay</h2>
+    <p class="sub">No awkward calculations. Everyone gets their own share while the payment still goes to the merchant.</p>
+    <div class="flow-line"><span class="flow-pill">Scan</span><span class="flow-arrow">→</span><span class="flow-pill">Split</span><span class="flow-arrow">→</span><span class="flow-pill">Pay</span></div>
+  </div>
+  <div class="card">
+    <div class="eyebrow">Your interface</div>
+    <h2>Light or black.</h2>
+    <p class="sub">Use the theme button at the top to switch between light and dark modes.</p>
+  </div>
+</section>
+
+<section id="terms" class="screen">
+  <div class="eyebrow">Required before use</div>
+  <h2>Terms &amp; Conditions</h2>
+  <p class="sub">Please read and accept the terms before using Your Share.</p>
+  <div class="card legal-card"><div class="legal-text">
+    <p><strong>1. About Your Share</strong><br />Your Share helps users divide a merchant bill and create individual UPI payment links and QR codes for each share. It is not a wallet or a bank and does not hold money.</p>
+    <p><strong>2. Payments</strong><br />Your Share does not request, collect, or store UPI PINs, OTPs, bank passwords, card PINs, or other payment credentials. Your Share does not process payments; they are made in your own UPI/payment app.</p>
+    <p><strong>3. Verify payment information</strong><br />You are responsible for verifying the payee name, payment destination and amount in your payment app before confirming any transaction. Decoding a QR does not mean Your Share has verified the payee.</p>
+    <p><strong>4. No payment status</strong><br />Your Share cannot independently verify whether a payment succeeded. Check your UPI/payment app for the transaction result.</p>
+    <p><strong>5. User responsibility</strong><br />You must not use the service for fraudulent, deceptive, unauthorized, or unlawful transactions.</p>
+    <p><strong>6. Privacy</strong><br />QR data is processed in your browser and is not sent to a server. Only your theme, terms acceptance and cookie choice are stored locally on your device.</p>
+  </div></div>
+  <label class="check-row"><input id="termsCheck" type="checkbox" /><span>I have read and agree to the Terms &amp; Conditions.</span></label>
+  <div id="termsErr" class="err"></div>
+  <button class="primary" onclick="acceptTerms()">Accept &amp; continue →</button>
+</section>
+
+<section id="how" class="screen">
+  <div class="eyebrow">How it works</div>
+  <h2>Three tiny steps.</h2>
+  <div class="card"><div class="eyebrow">01</div><h3>Scan</h3><p class="sub">Point your phone at the merchant's existing payment QR, or upload a photo of it.</p></div>
+  <div class="card"><div class="eyebrow">02</div><h3>Split</h3><p class="sub">Choose equal shares or enter custom amounts.</p></div>
+  <div class="card"><div class="eyebrow">03</div><h3>Pay</h3><p class="sub">Give each person their individual payment link or QR.</p></div>
+  <button class="primary" onclick="go('scan')">Try it →</button>
+</section>
+
+<section id="scan" class="screen">
+  <div class="progress"><div class="progress-bar on"></div><div class="progress-bar"></div><div class="progress-bar"></div></div>
+  <div class="eyebrow">Step 01</div>
+  <h2>Scan the merchant QR.</h2>
+  <p class="sub">Point your camera at the QR already sitting on the table.</p>
+  <div id="scanner" class="scanner idle">
+    <video id="camera" playsinline muted autoplay></video>
+    <div class="scan-overlay">
+      <div class="scan-frame"><div class="scan-line"></div></div>
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <div id="scanStatus" class="scanner-status">Camera ready.</div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="cameraBtn" class="primary" onclick="startCamera()">Start camera</button>
+    <label class="secondary" style="display:flex;align-items:center;justify-content:center;cursor:pointer">Upload QR
+      <input id="qrFile" class="file-input" type="file" accept="image/*" capture="environment" />
+    </label>
+  </div>
+  <div class="camera-note">Camera access needs HTTPS and your permission. You can always upload a QR photo instead.</div>
+  <canvas id="qrCanvas" style="display:none"></canvas>
+</section>
+
+<section id="merchant" class="screen">
+  <div class="progress"><div class="progress-bar on"></div><div class="progress-bar on"></div><div class="progress-bar"></div></div>
+  <div class="eyebrow">Step 01 · Confirm</div>
+  <h2>Check the payee.</h2>
+  <div class="card">
+    <div class="eyebrow">Payee</div>
+    <h2 id="mName" style="margin-bottom:4px">—</h2>
+    <div class="eyebrow" style="margin-top:14px">Payment destination</div>
+    <div id="mVpa" class="sub" style="margin-top:4px;color:var(--text);font-weight:700">—</div>
+    <span class="tag">QR data detected</span>
+    <div id="mExtra" class="camera-note" style="text-align:left"></div>
+    <div style="height:20px"></div>
+    <label class="field-label" for="billTotal">Bill total (₹)</label>
+    <input id="billTotal" class="input" placeholder="Enter bill total" inputmode="decimal" type="number" min="0" step="0.01" />
+    <div id="amtNote" class="camera-note" style="text-align:left"></div>
+    <div id="billErr" class="err" style="margin-top:8px"></div>
+    <div class="camera-note" style="text-align:left;margin-top:0">Always check the payee and destination before continuing.</div>
+  </div>
+  <button class="primary" onclick="confirmMerchant()">Continue →</button>
+</section>
+
+<section id="split" class="screen">
+  <div class="progress"><div class="progress-bar on"></div><div class="progress-bar on"></div><div class="progress-bar on"></div></div>
+  <div class="eyebrow">Step 02</div>
+  <h2>Split <span id="splitTitle">—</span>.</h2>
+  <div class="tabs">
+    <button id="equalTab" class="tab selected" onclick="setMode('equal')">Equal</button>
+    <button id="customTab" class="tab" onclick="setMode('custom')">Custom</button>
+  </div>
+  <div id="equalMode" class="card">
+    <label class="field-label">People</label>
+    <div class="counter">
+      <button class="icon-btn" onclick="changePeople(-1)" aria-label="Fewer people">−</button>
+      <span id="peopleCount" class="counter-num">2</span>
+      <button class="icon-btn" onclick="changePeople(1)" aria-label="More people">+</button>
+    </div>
+    <div id="equalRows"></div>
+  </div>
+  <div id="customMode" class="card" style="display:none">
+    <div id="customRows"></div>
+    <div class="gap10"></div>
+    <button class="secondary" onclick="addPerson()">+ Add person</button>
+  </div>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <span class="person">Split total</span><strong id="splitTotal">—</strong>
+  </div>
+  <div id="splitErr" class="err"></div>
+  <button class="primary" onclick="generateShares()">Generate payment QRs →</button>
+</section>
+
+<section id="qrs" class="screen">
+  <div class="eyebrow">Step 03</div>
+  <h2>Everyone pays their share.</h2>
+  <p class="sub">Each person gets an individual payment link and QR for the same destination. Check the payee in your payment app before paying.</p>
+  <div id="shareCards"></div>
+  <div class="camera-note">Your Share never asks for or handles UPI PINs, OTPs, banking passwords, or card PINs.</div>
+  <button class="secondary" style="margin-top:15px" onclick="go('status')">Payment tracking</button>
+</section>
+
+<section id="status" class="screen">
+  <div class="eyebrow">Payment tracking</div>
+  <h2>Waiting for confirmation.</h2>
+  <p class="sub">Your Share cannot independently verify this payment yet. Check your UPI/payment app for the transaction result.</p>
+  <div id="statusRows" class="card"></div>
+  <div class="camera-note">Opening a link, scanning a QR or returning to this page does not mean a payment succeeded.</div>
+  <button class="secondary" style="margin-top:15px" onclick="go('qrs')">← Back to payment QRs</button>
+</section>
+
+<nav id="bottomNav" class="bottom-nav">
+  <button onclick="go('home')">Home</button>
+  <button onclick="go('scan')">New bill</button>
+  <button onclick="showOnly('terms')">Terms</button>
+</nav>
+
+<footer class="footer">
+  © 2026 Your Share. All rights reserved.<br />
+  <button onclick="showOnly('terms')">Terms &amp; Conditions</button>
+</footer>
+</main>
+
+<div id="cookieBanner" class="cookie-banner">
+  <div class="cookie-title">Cookies, kept simple.</div>
+  <div class="cookie-text">Your Share uses essential browser storage for things like your theme preference, terms acceptance and cookie preference. Nothing else is stored.</div>
+  <div class="btn-row">
+    <button class="secondary" onclick="setCookies('essential')">Essential only</button>
+    <button class="primary" onclick="setCookies('all')">Accept all</button>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const store = {
+  get(k){ try { return localStorage.getItem("yourshare-" + k); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem("yourshare-" + k, v); } catch (e) {} }
+};
+const state = { qr: null, bill: 0, mode: "equal", people: 2, custom: [{n:"Person 1",a:""},{n:"Person 2",a:""}], shares: [] };
+let cameraStream = null, raf = null;
+
+/* THEME */
+function toggleTheme(){
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  store.set("theme", next);
+  document.querySelector('meta[name="theme-color"]').content = next === "dark" ? "#0b0b0b" : "#f5f5f2";
+}
+
+/* TERMS GATE + NAV */
+const termsAccepted = () => store.get("terms") === "accepted";
+function lockTerms(){
+  const c = $("termsCheck"), ok = termsAccepted();
+  if (ok) c.checked = true;
+  c.disabled = ok;
+  $("termsErr").textContent = "";
+}
+function acceptTerms(){
+  if (!termsAccepted()) {
+    if (!$("termsCheck").checked) { $("termsErr").textContent = "Please accept the terms first."; return; }
+    store.set("terms", "accepted");
+  }
+  showOnly("home");
+}
+function requireTerms(){
+  if (termsAccepted()) return true;
+  showOnly("terms");
+  $("termsErr").textContent = "Please accept the terms first.";
+  return false;
+}
+function go(id){
+  if (!requireTerms()) return;
+  if (["merchant","split","qrs","status"].includes(id) && !state.qr) id = "scan";
+  if (["qrs","status"].includes(id) && !state.shares.length) id = "split";
+  showOnly(id);
+}
+function showOnly(id){
+  if (id !== "terms" && !termsAccepted()) id = "terms";
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+  $("bottomNav").style.display = termsAccepted() ? "" : "none";
+  if (id === "terms") lockTerms();
+  if (id === "split") updateSplit();
+  if (id === "qrs") renderShares();
+  if (id === "status") renderStatus();
+  if (id !== "scan") stopCamera();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* COOKIES */
+function setCookies(c){ store.set("cookies", c); $("cookieBanner").classList.remove("show"); toast(c === "all" ? "Preference saved." : "Essential only."); }
+if (!store.get("cookies")) setTimeout(() => $("cookieBanner").classList.add("show"), 800);
+
+/* SCANNER */
+const setStatus = t => { $("scanStatus").textContent = t; };
+async function startCamera(){
+  if (!requireTerms()) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus("Camera unavailable. You can upload a QR image instead."); return; }
+  try {
+    stopCamera();
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const v = $("camera"); v.srcObject = cameraStream; await v.play();
+    $("scanner").classList.remove("idle");
+    $("cameraBtn").textContent = "Stop camera"; $("cameraBtn").onclick = () => { stopCamera(); setStatus("Camera ready."); };
+    setStatus("Scanning… hold the QR inside the frame.");
+    raf = requestAnimationFrame(scanFrame);
+  } catch (e) {
+    stopCamera();
+    setStatus(e.name === "NotAllowedError" || e.name === "SecurityError" ? "Camera permission was denied. You can upload a QR image instead." : "Camera unavailable. You can upload a QR image instead.");
+  }
+}
+function stopCamera(){
+  if (raf) cancelAnimationFrame(raf); raf = null;
+  if (cameraStream) cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null;
+  $("camera").srcObject = null;
+  $("scanner").classList.add("idle");
+  $("cameraBtn").textContent = "Start camera"; $("cameraBtn").onclick = startCamera;
+}
+function decode(source, w, h, max){
+  const s = Math.min(1, max / Math.max(w, h));
+  const c = $("qrCanvas"); c.width = Math.floor(w * s); c.height = Math.floor(h * s);
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(source, 0, 0, c.width, c.height);
+  const d = ctx.getImageData(0, 0, c.width, c.height);
+  return window.jsQR ? jsQR(d.data, d.width, d.height, { inversionAttempts: "attemptBoth" }) : null;
+}
+function scanFrame(){
+  const v = $("camera");
+  if (!cameraStream) return;
+  if (v.readyState >= 2 && v.videoWidth) {
+    const r = decode(v, v.videoWidth, v.videoHeight, 1000);
+    if (r && r.data) { stopCamera(); handlePayload(r.data); return; }
+  }
+  raf = requestAnimationFrame(scanFrame);
+}
+$("qrFile").addEventListener("change", async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  if (!requireTerms()) { e.target.value = ""; return; }
+  stopCamera(); setStatus("Reading QR image…");
+  try {
+    const img = await createImageBitmap(f);
+    const r = decode(img, img.width, img.height, 1600);
+    if (r && r.data) handlePayload(r.data); else setStatus("No QR found. Try a clearer photo.");
+  } catch (err) { setStatus("No QR found. Try a clearer photo."); }
+  e.target.value = "";
+});
+
+/* UPI PARSING */
+function parseUPI(raw){
+  const t = raw.trim();
+  if (!/^upi:\/\/pay\?/i.test(t)) return null;
+  let p; try { p = new URLSearchParams(t.slice(t.indexOf("?") + 1)); } catch (e) { return null; }
+  const pa = (p.get("pa") || "").trim();
+  if (!/^[^\s@]+@[^\s@]+$/.test(pa)) return null;
+  const g = k => (p.get(k) || "").trim();
+  const am = parseFloat(g("am"));
+  return { pa, pn: g("pn"), am: am > 0 ? am : null, cu: g("cu") || "INR", mc: g("mc"), tn: g("tn") };
+}
+function handlePayload(raw){
+  const q = parseUPI(raw);
+  if (!q) { setStatus("Unsupported payment QR"); toast("Unsupported payment QR"); return; }
+  if (q.cu.toUpperCase() !== "INR") { setStatus("Unsupported payment QR"); toast("Only INR payments are supported."); return; }
+  state.qr = q; state.shares = [];
+  setStatus("QR detected ✓");
+  $("mName").textContent = q.pn || "Payee name unavailable";
+  $("mVpa").textContent = q.pa;
+  const extra = [q.mc && "Merchant category: " + q.mc, q.tn && "Note: " + q.tn].filter(Boolean).join(" · ");
+  $("mExtra").textContent = extra;
+  $("billTotal").value = q.am ? q.am : "";
+  $("amtNote").textContent = q.am ? "Amount detected from QR: " + formatINR(q.am) + ". Review and edit it if the actual bill is different." : "";
+  $("billErr").textContent = "";
+  setTimeout(() => showOnly("merchant"), 350);
+}
+function confirmMerchant(){
+  const v = parseFloat($("billTotal").value);
+  if (!(v > 0)) { $("billErr").textContent = "Enter a valid bill total."; return; }
+  state.bill = Math.round(v * 100) / 100; state.shares = [];
+  showOnly("split");
+}
+
+/* SPLIT (all maths in paise) */
+const toPaise = v => Math.round(parseFloat(v) * 100);
+function equalShares(){
+  const total = Math.round(state.bill * 100), n = state.people, base = Math.floor(total / n), rem = total - base * n;
+  return Array.from({ length: n }, (_, i) => ({ name: "Person " + (i + 1), paise: base + (i < rem ? 1 : 0) }));
+}
+function changePeople(d){ state.people = Math.max(2, Math.min(20, state.people + d)); $("peopleCount").textContent = state.people; updateSplit(); }
+function setMode(m){
+  state.mode = m;
+  $("equalMode").style.display = m === "equal" ? "block" : "none";
+  $("customMode").style.display = m === "custom" ? "block" : "none";
+  $("equalTab").classList.toggle("selected", m === "equal");
+  $("customTab").classList.toggle("selected", m === "custom");
+  updateSplit();
+}
+function updateSplit(){
+  $("splitTitle").textContent = formatINR(state.bill);
+  $("splitErr").textContent = "";
+  if (state.mode === "equal") {
+    $("equalRows").innerHTML = "";
+    equalShares().forEach(s => $("equalRows").appendChild(row(s.name, formatINR(s.paise / 100))));
+    $("splitTotal").textContent = formatINR(state.bill) + " / " + formatINR(state.bill);
+  } else { renderCustom(); updateCustomTotal(); }
+}
+function row(n, a){
+  const r = document.createElement("div"); r.className = "split-row";
+  const s1 = document.createElement("span"); s1.className = "person"; s1.textContent = n;
+  const s2 = document.createElement("span"); s2.className = "share"; s2.textContent = a;
+  r.append(s1, s2); return r;
+}
+function renderCustom(){
+  const box = $("customRows"); box.innerHTML = "";
+  state.custom.forEach((p, i) => {
+    const r = document.createElement("div"); r.className = "split-row";
+    const n = document.createElement("input"); n.className = "input name-in"; n.value = p.n; n.placeholder = "Name"; n.maxLength = 30;
+    n.oninput = () => { p.n = n.value; };
+    const a = document.createElement("input"); a.className = "input amt-in"; a.type = "number"; a.min = "0"; a.step = "0.01"; a.inputMode = "decimal"; a.placeholder = "₹0"; a.value = p.a;
+    a.oninput = () => { p.a = a.value; updateCustomTotal(); };
+    r.append(n, a);
+    if (state.custom.length > 2) { const x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "Remove"); x.onclick = () => { state.custom.splice(i, 1); renderCustom(); updateCustomTotal(); }; r.append(x); }
+    box.appendChild(r);
+  });
+}
+function addPerson(){ if (state.custom.length >= 20) return; state.custom.push({ n: "Person " + (state.custom.length + 1), a: "" }); renderCustom(); updateCustomTotal(); }
+function customPaise(){ return state.custom.reduce((s, p) => { const v = toPaise(p.a); return s + (v > 0 ? v : 0); }, 0); }
+function updateCustomTotal(){
+  const t = customPaise() / 100;
+  $("splitTotal").textContent = formatINR(t) + " / " + formatINR(state.bill);
+  $("splitErr").textContent = Math.round(t * 100) === Math.round(state.bill * 100) ? "" : "Your shares must equal the bill.";
+}
+function buildUPI(amountPaise){
+  const q = state.qr, e = v => encodeURIComponent(v).replace(/%40/g, "@");
+  let u = "upi://pay?pa=" + e(q.pa);
+  if (q.pn) u += "&pn=" + e(q.pn);
+  if (q.mc) u += "&mc=" + e(q.mc);
+  if (q.tn) u += "&tn=" + e(q.tn);
+  return u + "&am=" + (amountPaise / 100).toFixed(2) + "&cu=" + e(q.cu || "INR");
+}
+function generateShares(){
+  let list;
+  if (state.mode === "equal") list = equalShares();
+  else {
+    if (customPaise() !== Math.round(state.bill * 100) || state.custom.some(p => !(toPaise(p.a) > 0))) { $("splitErr").textContent = "Your shares must equal the bill."; return; }
+    list = state.custom.map((p, i) => ({ name: p.n.trim() || "Person " + (i + 1), paise: toPaise(p.a) }));
+  }
+  state.shares = list.map(s => ({ name: s.name, paise: s.paise, link: buildUPI(s.paise) }));
+  showOnly("qrs");
+}
+
+/* PAYMENT QRS */
+function qrSvg(text){
+  const qr = qrcode(0, "M"); qr.addData(text); qr.make();
+  return qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+}
+function renderShares(){
+  const box = $("shareCards"); box.innerHTML = "";
+  state.shares.forEach((s, i) => {
+    const c = document.createElement("div"); c.className = "card";
+    const mk = (cls, t) => { const d = document.createElement("div"); d.className = cls; d.textContent = t; return d; };
+    const wrap = document.createElement("div"); wrap.className = "qr-wrap"; wrap.innerHTML = qrSvg(s.link);
+    const br = document.createElement("div"); br.className = "gap10";
+    const btns = document.createElement("div"); btns.className = "btn-row";
+    const cp = document.createElement("button"); cp.className = "secondary"; cp.textContent = "Copy link"; cp.onclick = () => copyLink(s.link);
+    const sh = document.createElement("button"); sh.className = "primary"; sh.textContent = "Share"; sh.onclick = () => sharePayment(s);
+    btns.append(cp, sh);
+    c.append(mk("merchant-name", s.name), mk("amount", formatINR(s.paise / 100)), wrap,
+      mk("merchant-handle", (state.qr.pn || "Payee name unavailable")), mk("merchant-handle", state.qr.pa), br, btns);
+    box.appendChild(c);
+  });
+}
+function renderStatus(){
+  const box = $("statusRows"); box.innerHTML = "";
+  state.shares.forEach(s => {
+    const r = document.createElement("div"); r.className = "split-row";
+    const l = document.createElement("div");
+    const a = document.createElement("div"); a.className = "person"; a.textContent = s.name;
+    const b = document.createElement("div"); b.className = "sub"; b.textContent = formatINR(s.paise / 100);
+    l.append(a, b);
+    const w = document.createElement("span"); w.className = "waiting"; w.textContent = "Waiting for confirmation";
+    r.append(l, w); box.appendChild(r);
+  });
+}
+async function copyLink(link){
+  try { await navigator.clipboard.writeText(link); toast("Payment link copied."); }
+  catch (e) {
+    const t = document.createElement("textarea"); t.value = link; document.body.appendChild(t); t.select();
+    try { document.execCommand("copy"); toast("Payment link copied."); } catch (x) { toast("Copy isn't available here."); }
+    t.remove();
+  }
+}
+async function sharePayment(s){
+  const text = s.name + " — pay " + formatINR(s.paise / 100) + " to " + (state.qr.pn || state.qr.pa) + ":\n" + s.link;
+  if (navigator.share) { try { await navigator.share({ title: "Your Share — " + s.name, text }); } catch (e) {} }
+  else copyLink(s.link);
+}
+
+/* UTIL */
+function formatINR(v){ return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(v || 0); }
+function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(window.__t); window.__t = setTimeout(() => t.classList.remove("show"), 2200); }
+
+/* INIT */
+$("splitTitle").textContent = "—"; $("splitTotal").textContent = "—";
+showOnly(termsAccepted() ? "home" : "terms");
+</script>
+</body>
+</html>
