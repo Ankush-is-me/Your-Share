@@ -544,7 +544,9 @@ function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("sho
 
 /* INIT */
 $("splitTitle").textContent = "—"; $("splitTotal").textContent = "—";
+applyTheme(store.get("theme") || "system");
 showOnly(termsAccepted() ? "home" : "terms");
 </script>
 </body>
 </html>
+
