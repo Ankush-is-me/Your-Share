@@ -130,8 +130,12 @@ h3{margin:0;letter-spacing:-.5px}
   </div>
   <div class="card">
     <div class="eyebrow">Your interface</div>
-    <h2>Light or black.</h2>
-    <p class="sub">Use the theme button at the top to switch between light and dark modes.</p>
+    <h2>Pick your look.</h2>
+    <div class="tabs" style="margin:12px 0 0">
+      <button class="tab theme-opt" data-mode="light" onclick="setTheme('light')">Light</button>
+      <button class="tab theme-opt" data-mode="system" onclick="setTheme('system')">System</button>
+      <button class="tab theme-opt" data-mode="dark" onclick="setTheme('dark')">Dark</button>
+    </div>
   </div>
 </section>
 
@@ -284,15 +288,20 @@ const state = { qr: null, bill: 0, mode: "equal", people: 2, custom: [{n:"Person
 let cameraStream = null, raf = null;
 
 /* THEME */
-function toggleTheme(){
-  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  store.set("theme", next);
-  document.querySelector('meta[name="theme-color"]').content = next === "dark" ? "#0b0b0b" : "#f5f5f2";
+function applyTheme(mode){
+  const dark = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  document.querySelector('meta[name="theme-color"]').content = dark ? "#0b0b0b" : "#f5f5f2";
+  document.querySelectorAll(".theme-opt").forEach(b => b.classList.toggle("selected", b.dataset.mode === mode));
 }
-
-/* TERMS GATE + NAV */
-const termsAccepted = () => store.get("terms") === "accepted";
+function setTheme(mode){ store.set("theme", mode); applyTheme(mode); }
+function toggleTheme(){
+  const cur = store.get("theme") || "system";
+  setTheme(cur === "system" ? "light" : cur === "light" ? "dark" : "system");
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if ((store.get("theme") || "system") === "system") applyTheme("system");
+});x
 function lockTerms(){
   const c = $("termsCheck"), ok = termsAccepted();
   if (ok) c.checked = true;
