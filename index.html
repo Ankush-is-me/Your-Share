@@ -305,7 +305,9 @@ function toggleTheme(){
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
   if ((store.get("theme") || "system") === "system") applyTheme("system");
-});x
+});
+  /* TERMS GATE + NAV */
+const termsAccepted = () => store.get("terms") === "accepted";
 function lockTerms(){
   const c = $("termsCheck"), ok = termsAccepted();
   if (ok) c.checked = true;
