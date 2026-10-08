@@ -405,8 +405,8 @@ $("qrFile").addEventListener("change", async e => {
 });
 
 /* UPI PARSING */
-function parseUPI(raw){ 
-  const t = raw.trim();
+function parseUPI(raw){
+  const t = raw.trim(); 
   if (!/^upi:\/\/pay\?/i.test(t)) return null;
   let p; try { p = new URLSearchParams(t.slice(t.indexOf("?") + 1)); } catch (e) { return null; }
   const pa = (p.get("pa") || "").trim();
