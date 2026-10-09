@@ -3,12 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="description" content="Your Share — scan one merchant QR, split the bill, and give everyone their own payment link." />
-<meta name="theme-color" content="#0b0b0b" />
 <title>Your Share — One bill. Everyone pays.</title>
+<meta name="description" content="Your Share — scan one merchant QR, split the bill, and give everyone their own payment link." />
+<meta property="og:title" content="Your Share — One bill. Everyone pays." />
+<meta property="og:description" content="Scan one merchant QR, split the bill, and give everyone their own payment link." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://ankush-is-me.github.io/Your-Share/" />
+<meta name="theme-color" content="#0b0b0b" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%23111'/%3E%3Ccircle cx='50' cy='50' r='16' fill='%23fff'/%3E%3C/svg%3E" />
+<script>try{(function(){var s=localStorage.getItem("yourshare-theme");var d=s==="dark"||((!s||s==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})()}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script>try{if(localStorage.getItem("yourshare-theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
 <style>
 :root{--bg:#f5f5f2;--surface:#fff;--surface-2:#fafaf8;--text:#171717;--muted:#777770;--line:#e6e6df;--button:#111;--button-text:#fff;--danger:#c63c3c;--shadow:0 16px 50px rgba(0,0,0,.06)}
 [data-theme="dark"]{--bg:#080808;--surface:#151515;--surface-2:#101010;--text:#f4f4ef;--muted:#9c9c96;--line:#292929;--button:#f4f4ef;--button-text:#0b0b0b;--danger:#ff7777;--shadow:0 16px 50px rgba(0,0,0,.3)}
@@ -96,6 +101,9 @@ h3{margin:0;letter-spacing:-.5px}
 .footer{margin-top:35px;padding-top:17px;border-top:1px solid var(--line);color:var(--muted);text-align:center;font-size:10px;line-height:1.55}
 .footer button{margin-top:5px;border:0;background:transparent;color:var(--muted);text-decoration:underline;font-size:11px;min-height:32px}
 @media(min-width:700px){body{padding:30px 0}.app{min-height:calc(100vh - 60px);border-radius:30px}}
+button:focus-visible,.check-row input:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+@media(hover:hover){.primary:hover{opacity:.88}.secondary:hover,.icon-btn:hover{border-color:var(--text)}.tab:hover{color:var(--text)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
 </style>
 </head>
 <body>
@@ -103,7 +111,7 @@ h3{margin:0;letter-spacing:-.5px}
 <header class="topbar">
   <div class="logo">Your Share<span class="logo-dot"></span></div>
   <div class="top-actions">
-    <button class="icon-btn" type="button" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle theme">◐</button>
+    <button class="icon-btn" type="button" onclick="toggleTheme()" aria-label="Change theme" title="Toggle theme">◐</button>
     <button class="icon-btn" type="button" onclick="showOnly('terms')" aria-label="Terms" title="Terms">⋯</button>
   </div>
 </header>
@@ -126,8 +134,12 @@ h3{margin:0;letter-spacing:-.5px}
   </div>
   <div class="card">
     <div class="eyebrow">Your interface</div>
-    <h2>Light or black.</h2>
-    <p class="sub">Use the theme button at the top to switch between light and dark modes.</p>
+    <h2>Pick your look.</h2>
+    <div class="tabs" style="margin:12px 0 0">
+      <button class="tab theme-opt" data-mode="light" onclick="setTheme('light')">Light</button>
+      <button class="tab theme-opt" data-mode="system" onclick="setTheme('system')">System</button>
+      <button class="tab theme-opt" data-mode="dark" onclick="setTheme('dark')">Dark</button>
+    </div>
   </div>
 </section>
 
@@ -280,14 +292,21 @@ const state = { qr: null, bill: 0, mode: "equal", people: 2, custom: [{n:"Person
 let cameraStream = null, raf = null;
 
 /* THEME */
-function toggleTheme(){
-  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-  document.documentElement.setAttribute("data-theme", next);
-  store.set("theme", next);
-  document.querySelector('meta[name="theme-color"]').content = next === "dark" ? "#0b0b0b" : "#f5f5f2";
+function applyTheme(mode){
+  const dark = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  document.querySelector('meta[name="theme-color"]').content = dark ? "#0b0b0b" : "#f5f5f2";
+  document.querySelectorAll(".theme-opt").forEach(b => b.classList.toggle("selected", b.dataset.mode === mode));
 }
-
-/* TERMS GATE + NAV */
+function setTheme(mode){ store.set("theme", mode); applyTheme(mode); }
+function toggleTheme(){
+  const cur = store.get("theme") || "system";
+  setTheme(cur === "system" ? "light" : cur === "light" ? "dark" : "system");
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if ((store.get("theme") || "system") === "system") applyTheme("system");
+});
+  /* TERMS GATE + NAV */
 const termsAccepted = () => store.get("terms") === "accepted";
 function lockTerms(){
   const c = $("termsCheck"), ok = termsAccepted();
@@ -540,7 +559,9 @@ function toast(m){ const t = $("toast"); t.textContent = m; t.classList.add("sho
 
 /* INIT */
 $("splitTitle").textContent = "—"; $("splitTotal").textContent = "—";
+applyTheme(store.get("theme") || "system");
 showOnly(termsAccepted() ? "home" : "terms");
 </script>
 </body>
 </html>
+
