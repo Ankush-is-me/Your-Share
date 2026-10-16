@@ -184,9 +184,8 @@ button:focus-visible,.check-row input:focus-visible{outline:2px solid var(--text
   </div>
   <div class="btn-row">
     <button id="cameraBtn" class="primary" onclick="startCamera()">Start camera</button>
-    <label class="secondary" style="display:flex;align-items:center;justify-content:center;cursor:pointer">Upload QR
-      <input id="qrFile" class="file-input" type="file" accept="image/*" />
-    </label>
+        <button class="secondary" type="button" onclick="document.getElementById('qrFile').click()">Upload QR</button>
+    <input id="qrFile" class="file-input" type="file" accept="image/*" />
   </div>
   <div class="camera-note">Camera access needs HTTPS and your permission. You can always upload a QR photo instead.</div>
   <canvas id="qrCanvas" style="display:none"></canvas>
@@ -458,7 +457,7 @@ function updateSplit(){
   if (state.mode === "equal") {
     $("equalRows").innerHTML = "";
     equalShares().forEach(s => $("equalRows").appendChild(row(s.name, formatINR(s.paise / 100))));
-    $("splitTotal").textContent = formatINR(state.bill) + " / " + formatINR(state.bill);
+   $("splitTotal").textContent = formatINR(state.bill) + " for " + state.people + " people";
   } else { renderCustom(); updateCustomTotal(); }
 }
 function row(n, a){
